@@ -1,10 +1,15 @@
 // src/products/products.service.ts
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
+import { safeUnlinkByRelativePath } from '../common/utils/file.utils';
 
 @Injectable()
 export class ProductsService {
@@ -13,12 +18,39 @@ export class ProductsService {
     @InjectModel(Product.name) private productModel: Model<Product>,
   ) {}
 
-  // ================= CREATE =================
-  async create(createProductDto: CreateProductDto): Promise<Product> {
-    const createdProduct = new this.productModel(createProductDto);
-    return createdProduct.save();
+  // ================= PRIVATE UTILS =================
+  private toPublicImagePath(filePath: string): string {
+    const normalized = filePath.replace(/\\/g, '/'); // กัน Windows path
+    // ตัด uploads/ หรือ ./uploads/ ออก
+    return normalized
+      .replace(/^\.?\/?uploads\//, '')
+      .replace(/^uploads\//, '');
   }
 
+  // ================= CREATE =================
+  async create(
+    dto: CreateProductDto,
+    file?: Express.Multer.File,
+  ): Promise<Product> {
+    const diskPath = file?.path?.replace(/\\/g, '/'); // uploads/products/uuid.jpg
+    const imageUrl = diskPath
+      ? this.toPublicImagePath(diskPath)
+      : undefined; // products/uuid.jpg
+
+    try {
+      return await this.productModel.create({
+        ...dto,
+        ...(imageUrl ? { imageUrl } : {}),
+      });
+    } catch (err) {
+      if (diskPath) {
+        await safeUnlinkByRelativePath(diskPath); // rollback ไฟล์
+      }
+      throw new InternalServerErrorException('Create product failed');
+    }
+  }
+
+  // ================= CREATE MANY =================
   async createMany(createProductDtos: CreateProductDto[]): Promise<Product[]> {
     return (await this.productModel.insertMany(createProductDtos)) as Product[];
   }
@@ -37,7 +69,10 @@ export class ProductsService {
   }
 
   // ================= UPDATE =================
-  async update(id: string, updateProductDto: UpdateProductDto): Promise<Product> {
+  async update(
+    id: string,
+    updateProductDto: UpdateProductDto,
+  ): Promise<Product> {
     const updatedProduct = await this.productModel
       .findByIdAndUpdate(id, updateProductDto, { new: true })
       .exec();
@@ -57,41 +92,29 @@ export class ProductsService {
     return deletedProduct;
   }
 
-  // ================= SEARCH (ข้อ 2 ของ Assignment) =================
+  // ================= SEARCH =================
   async search(query: any): Promise<Product[]> {
-    const {
-      name,        // คำค้นหาชื่อสินค้า
-      minPrice,    // ราคาต่ำสุด
-      maxPrice,    // ราคาสูงสุด
-      sortByPrice, // asc | desc
-    } = query;
-
-    // object สำหรับเก็บเงื่อนไขการค้นหา
+    const { name, minPrice, maxPrice, sortByPrice } = query;
     const filter: any = {};
 
-    // ค้นหาชื่อสินค้าแบบบางส่วน (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
     if (name) {
       filter.name = { $regex: name, $options: 'i' };
     }
 
-    // ค้นหาราคาเป็นช่วง
     if (minPrice || maxPrice) {
       filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice); // >=
-      if (maxPrice) filter.price.$lte = Number(maxPrice); // <=
+      if (minPrice) filter.price.$gte = Number(minPrice);
+      if (maxPrice) filter.price.$lte = Number(maxPrice);
     }
 
-    // สร้าง query จาก filter
     let queryBuilder = this.productModel.find(filter);
 
-    // เรียงราคาตามที่ผู้ใช้กำหนด
     if (sortByPrice === 'asc') {
-      queryBuilder = queryBuilder.sort({ price: 1 }); // ถูก → แพง
+      queryBuilder = queryBuilder.sort({ price: 1 });
     } else if (sortByPrice === 'desc') {
-      queryBuilder = queryBuilder.sort({ price: -1 }); // แพง → ถูก
+      queryBuilder = queryBuilder.sort({ price: -1 });
     }
 
-    // รัน query และคืนค่าผลลัพธ์
     return queryBuilder.exec();
   }
 }

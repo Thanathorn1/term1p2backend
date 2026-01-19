@@ -15,11 +15,14 @@ export class Product {
   @Prop({ required: true })
   name: string;
 
-  // field price
-  // required: true คือจำเป็นต้องมีค่า
-  // min: 0 ป้องกันราคาติดลบ
-  @Prop({ required: true, min: 0 })
+  // price: ราคาสินค้า
+  // - required: ต้องมีค่าเสมอ
+  // - min: ค่าต้องไม่ต่ำกว่า 0 (ห้ามติดลบ)
+  // - type: ชนิดข้อมูลเป็นตัวเลข
+  // - default: หากไม่กำหนดค่า จะตั้งเป็น 0
+  @Prop({ required: true, min: 0, type: Number, default: 0 })
   price: number;
+
 
   // field description
   // ไม่บังคับกรอก

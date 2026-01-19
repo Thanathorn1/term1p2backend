@@ -10,10 +10,16 @@ import {
   Param,
   Body,
   Query,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator
 } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { CreateProductDto } from './dto/create-product.dto';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { PRODUCT_IMAGE } from './products.constants';
 
 @Controller('products')
 export class ProductsController {
@@ -59,17 +65,33 @@ export class ProductsController {
 
   // ================= CREATE =================
   // POST /products
-  // รองรับทั้งสร้างรายการเดียว และหลายรายการ
+  // - รองรับสร้างสินค้าเดี่ยว
+  // - มีหรือไม่มีไฟล์ก็ได้
   @Post()
-  create(@Body() body: CreateProductDto | CreateProductDto[]) {
-    // ถ้า body เป็น array → createMany
-    if (Array.isArray(body)) {
-      return this.productsService.createMany(body);
-    }
-    // ถ้าเป็น object เดียว → create
-    return this.productsService.create(body);
-  }
+  @UseInterceptors(FileInterceptor('image')) // field name: image
+  create(
+    @Body() dto: CreateProductDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        fileIsRequired: false,
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: PRODUCT_IMAGE.MAX_SIZE,
+          }),
+        ],
+      }),
+    )
+    file?: Express.Multer.File,
+  ) {
+    // TODO: จัดการไฟล์ (ถ้ามี)
+    // เช่น เก็บ path, upload cloud, ฯลฯ
 
+    return {
+      ...dto,
+      image: file ? file.originalname : null,
+    };
+  }
+  
   // ================= REPLACE (PUT) =================
   // PUT /products/:id
   @Put(':id')
