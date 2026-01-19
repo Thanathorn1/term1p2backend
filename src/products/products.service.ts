@@ -28,26 +28,19 @@ export class ProductsService {
   }
 
   // ================= CREATE =================
-  async create(
-    dto: CreateProductDto,
-    file?: Express.Multer.File,
-  ): Promise<Product> {
-    const diskPath = file?.path?.replace(/\\/g, '/'); // uploads/products/uuid.jpg
-    const imageUrl = diskPath
-      ? this.toPublicImagePath(diskPath)
-      : undefined; // products/uuid.jpg
+   async create(dto: CreateProductDto, file?: Express.Multer.File) {
 
-    try {
-      return await this.productModel.create({
-        ...dto,
-        ...(imageUrl ? { imageUrl } : {}),
-      });
-    } catch (err) {
-      if (diskPath) {
-        await safeUnlinkByRelativePath(diskPath); // rollback ไฟล์
-      }
-      throw new InternalServerErrorException('Create product failed');
-    }
+    // รวมข้อมูลจาก body + ชื่อไฟล์รูป
+    const product = new this.productModel({
+      ...dto,
+
+      // ถ้ามีไฟล์ → เก็บ filename
+      // ถ้าไม่มี → null
+      image: file ? file.filename : null,
+    });
+
+    // save ลง MongoDB จริง ๆ
+    return await product.save();
   }
 
   // ================= CREATE MANY =================

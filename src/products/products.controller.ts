@@ -65,15 +65,17 @@ export class ProductsController {
 
   // ================= CREATE =================
   // POST /products
-  // - รองรับสร้างสินค้าเดี่ยว
-  // - มีหรือไม่มีไฟล์ก็ได้
+  // - รับข้อมูลสินค้าจาก form-data
+  // - รองรับการอัปโหลดไฟล์รูป (image) หรือไม่มีก็ได้
   @Post()
-  @UseInterceptors(FileInterceptor('image')) // field name: image
+  @UseInterceptors(FileInterceptor('image')) // field name ต้องตรงกับ form-data
   create(
     @Body() dto: CreateProductDto,
+
+    // รับไฟล์จาก multipart/form-data
     @UploadedFile(
       new ParseFilePipe({
-        fileIsRequired: false,
+        fileIsRequired: false, // มีหรือไม่มีก็ได้
         validators: [
           new MaxFileSizeValidator({
             maxSize: PRODUCT_IMAGE.MAX_SIZE,
@@ -83,13 +85,9 @@ export class ProductsController {
     )
     file?: Express.Multer.File,
   ) {
-    // TODO: จัดการไฟล์ (ถ้ามี)
-    // เช่น เก็บ path, upload cloud, ฯลฯ
-
-    return {
-      ...dto,
-      image: file ? file.originalname : null,
-    };
+    // ห้าม return object เอง
+    // ส่งให้ service จัดการบันทึก DB
+    return this.productsService.create(dto, file);
   }
   
   // ================= REPLACE (PUT) =================

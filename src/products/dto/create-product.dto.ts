@@ -1,5 +1,5 @@
 import { IsString, IsNumber, Min, IsArray, ArrayNotEmpty, IsOptional, IsNotEmpty } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateProductDto {
   @IsNotEmpty()
@@ -16,8 +16,9 @@ export class CreateProductDto {
   @IsString()
   description: string;
 
-  @IsArray()
   @ArrayNotEmpty()
+  @Transform(({ value }) => JSON.parse(value))
+  @IsArray()
   @IsString({ each: true })
   color: string[];
 }
