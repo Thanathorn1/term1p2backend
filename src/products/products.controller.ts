@@ -103,12 +103,25 @@ export class ProductsController {
   // ================= UPDATE (PATCH) =================
   // PATCH /products/:id
   @Patch(':id')
+  @UseInterceptors(FileInterceptor('image'))
   update(
     @Param('id') id: string,
     @Body() updateProductDto: UpdateProductDto,
+    @UploadedFile(
+      new ParseFilePipe({
+        fileIsRequired: false,
+        validators: [
+          new MaxFileSizeValidator({
+            maxSize: PRODUCT_IMAGE.MAX_SIZE,
+          }),
+        ],
+      }),
+    )
+    file?: Express.Multer.File,   // ⭐ ต้องเป็น optional
   ) {
-    return this.productsService.update(id, updateProductDto);
+    return this.productsService.update(id, updateProductDto, file);
   }
+
 
   // ================= DELETE =================
   // DELETE /products/:id

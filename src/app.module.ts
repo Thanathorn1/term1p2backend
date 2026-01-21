@@ -5,6 +5,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ProductsModule } from './products/products.module';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
+import { AuthModule } from './security/auth/auth.module';
 @Module({
   imports: [
     // โหลดไฟล์ .env
@@ -27,13 +28,14 @@ import { join } from 'path';
         const normalized = uploadDest.replace(/^\.\/+/, '');
         return [
           {
-            rootPath: join(process.cwd(), normalized),
+            rootPath: join(__dirname, '..', '..', normalized),
             serveRoot: '/uploads',
           },
         ];
       },
     }),
     ProductsModule,
+    AuthModule,
   ],
 })
 export class AppModule { }

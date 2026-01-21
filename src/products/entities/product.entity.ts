@@ -39,7 +39,7 @@ export class Product {
   // เก็บชื่อไฟล์รูป (เช่น name.png)
   // MongoDB ไม่ได้เก็บไฟล์จริง เก็บแค่ path / filename
   @Prop()
-  image: string;
+  imageUrl: string;
 }
 
 // แปลง class Product ให้เป็น Mongoose Schema

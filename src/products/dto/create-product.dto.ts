@@ -1,4 +1,4 @@
-import { IsString, IsNumber, Min, IsArray, ArrayNotEmpty, IsOptional, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, Min, IsArray, ArrayNotEmpty, IsOptional, IsNotEmpty, IsNotEmptyObject } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
 export class CreateProductDto {
@@ -21,4 +21,9 @@ export class CreateProductDto {
   @IsArray()
   @IsString({ each: true })
   color: string[];
+
+  @IsOptional()
+  @IsString()
+  @IsNotEmptyObject()
+  imageUrl?: string;
 }

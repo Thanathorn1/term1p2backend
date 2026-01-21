@@ -10,6 +10,8 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { Product } from './entities/product.entity';
 import { safeUnlinkByRelativePath } from '../common/utils/file.utils';
+import { deleteFileIfExists } from '../common/utils/file.utils';
+
 
 @Injectable()
 export class ProductsService {
@@ -36,7 +38,7 @@ export class ProductsService {
 
       // ถ้ามีไฟล์ → เก็บ filename
       // ถ้าไม่มี → null
-      image: file ? file.filename : null,
+      imageUrl: file ? `products/${file.filename}` : null,
     });
 
     // save ลง MongoDB จริง ๆ
@@ -63,51 +65,80 @@ export class ProductsService {
 
   // ================= UPDATE =================
   async update(
-    id: string,
-    updateProductDto: UpdateProductDto,
+  id: string,
+  dto: UpdateProductDto,
+  file?: Express.Multer.File,
   ): Promise<Product> {
-    const updatedProduct = await this.productModel
-      .findByIdAndUpdate(id, updateProductDto, { new: true })
-      .exec();
+  const product = await this.productModel.findById(id).exec();
 
-    if (!updatedProduct) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+  if (!product) {
+    throw new NotFoundException(`Product with ID ${id} not found`);
+  }
+
+  // 🟡 ถ้ามีอัปโหลดรูปใหม่
+  if (file) {
+    // 🔥 ลบรูปเก่า
+    if (product.imageUrl) {
+      deleteFileIfExists(product.imageUrl);
     }
-    return updatedProduct;
+
+    // เก็บ path ใหม่
+    product.imageUrl = `products/${file.filename}`;
+  }
+
+  Object.assign(product, dto);
+  return await product.save();
   }
 
   // ================= DELETE =================
-  async remove(id: string): Promise<Product> {
-    const deletedProduct = await this.productModel.findByIdAndDelete(id).exec();
-    if (!deletedProduct) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
-    }
-    return deletedProduct;
+ async remove(id: string): Promise<Product> {
+  const product = await this.productModel.findById(id).exec();
+
+  if (!product) {
+    throw new NotFoundException(`Product with ID ${id} not found`);
   }
 
-  // ================= SEARCH =================
+  // 🔥 ลบไฟล์รูปก่อน
+  if (product.imageUrl) {
+    deleteFileIfExists(product.imageUrl);
+  }
+
+  await product.deleteOne();
+  return product;
+  }
+
+   // ================= SEARCH =================
   async search(query: any): Promise<Product[]> {
-    const { name, minPrice, maxPrice, sortByPrice } = query;
-    const filter: any = {};
+  const { name, minPrice, maxPrice, sortByPrice, color } = query;
+  const filter: any = {};
 
-    if (name) {
-      filter.name = { $regex: name, $options: 'i' };
-    }
-
-    if (minPrice || maxPrice) {
-      filter.price = {};
-      if (minPrice) filter.price.$gte = Number(minPrice);
-      if (maxPrice) filter.price.$lte = Number(maxPrice);
-    }
-
-    let queryBuilder = this.productModel.find(filter);
-
-    if (sortByPrice === 'asc') {
-      queryBuilder = queryBuilder.sort({ price: 1 });
-    } else if (sortByPrice === 'desc') {
-      queryBuilder = queryBuilder.sort({ price: -1 });
-    }
-
-    return queryBuilder.exec();
+  // ===== search by name =====
+  if (name) {
+    filter.name = { $regex: name, $options: 'i' };
   }
+
+  // ===== search color (มีสีนี้เป็นองค์ประกอบก็พอ) =====
+  if (color) {
+    filter.color = { $in: [color] };
+  }
+
+  // ===== search by price =====
+  if (minPrice || maxPrice) {
+    filter.price = {};
+    if (minPrice) filter.price.$gte = Number(minPrice);
+    if (maxPrice) filter.price.$lte = Number(maxPrice);
+  }
+
+  let queryBuilder = this.productModel.find(filter);
+
+  // ===== sort =====
+  if (sortByPrice === 'asc') {
+    queryBuilder = queryBuilder.sort({ price: 1 });
+  } else if (sortByPrice === 'desc') {
+    queryBuilder = queryBuilder.sort({ price: -1 });
+  }
+
+  return queryBuilder.exec();
+  }
+
 }
